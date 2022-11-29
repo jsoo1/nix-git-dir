@@ -44,7 +44,7 @@ rec {
       matches = match lib.head raw.HEAD;
     in
     if isNull matches
-    then throw "Failed parsing .git/HEAD, got: ${raw.HEAD}"
+    then throw "Failed parsing ${gitDir}/HEAD, got: ${raw.HEAD}"
     else {
       fold = merge:
         let
@@ -76,7 +76,7 @@ rec {
                   if !isNull m then [ (elemAt m 1) ] else [ ])
                 (if isNull packed-refs' then [ ] else packed-refs');
 
-            msg = "rev ${rev} not found in .git/FETCH_HEAD or .git/packed-refs";
+            msg = "rev ${rev} not found in ${gitDir}/FETCH_HEAD or ${gitDir}/packed-refs";
 
             remotes' =
               if (tryEval raw.refs.remotes).success
@@ -141,7 +141,7 @@ rec {
 
             short-ref =
               if isNull short-matches
-              then throw "failed parsing .git/HEAD, got: ${raw.HEAD}"
+              then throw "failed parsing ${gitDir}/HEAD, got: ${raw.HEAD}"
               else elemAt short-matches 1;
 
             raw.refs.heads =
@@ -165,12 +165,12 @@ rec {
               if !isNull matches
               then elemAt matches 0
               else
-                throw "failed parsing .git/${ref}, got: ${val}";
+                throw "failed parsing ${gitDir}/${ref}, got: ${val}";
 
             packed-ref =
               let
                 msg =
-                  "${toString ref}${toString rev} missing from .git/packed-refs";
+                  "${toString ref}${toString rev} missing from ${gitDir}/packed-refs";
               in
               if isNull packed-refs
               then null
@@ -183,14 +183,14 @@ rec {
               then refs.heads."${short-ref}"
 
               else if isNull packed-refs
-              then throw ".git/${ref} missing and .git/packed-refs does not exist"
+              then throw "${gitDir}/${ref} missing and ${gitDir}/packed-refs does not exist"
 
               else if (tryEval packed-ref).success
               then packed-ref.rev
 
               else
                 throw
-                  "could not find current revision in: .git/HEAD, .git/${ref}, .git/packed-refs";
+                  "could not find current revision in: ${gitDir}/HEAD, ${gitDir}/${ref}, ${gitDir}/packed-refs";
           };
 
       rev = HEAD.fold { rev = r: r.rev; ref = r: r.rev; };
@@ -249,7 +249,7 @@ rec {
 
     head = "(${lib.sha})\n|ref:[[:space:]]+(.*)\n";
 
-    # a "parser" for a line in .git/packed-refs
+    # a "parser" for a line in ${gitDir}}/packed-refs
     refLineP = l:
       let
         matches = match "(${lib.sha})[[:space:]]+(.*)\n?" l;
