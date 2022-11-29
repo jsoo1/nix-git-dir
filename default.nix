@@ -36,7 +36,6 @@ in
 
 assert !isPath gitDir -> throw "${gitDir} is not an absolute path";
 assert !pathExists gitDir -> throw "${gitDir} does not exist";
-assert isNull (match ".*\.git" (toString gitDir)) -> throw "${gitDir} must point to a .git directory";
 
 rec {
   HEAD =
