@@ -26,3 +26,12 @@ or the library definitions:
 
 One very useful reference when working on git dirs:
 https://git-scm.com/docs/gitrepository-layout
+
+# Unimplemented (yet)
+
+- Worktrees
+- commondir
+
+# May never be implemented
+
+- non-file refstore backend
