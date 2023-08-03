@@ -34,7 +34,6 @@ let
     ;
 in
 
-assert !isPath gitDir -> throw "${gitDir} is not an absolute path";
 assert !pathExists gitDir -> throw "${gitDir} does not exist";
 
 rec {
