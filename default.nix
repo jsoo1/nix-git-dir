@@ -39,18 +39,26 @@ in
 assert !pathExists dotGit -> throw "${dotGit} does not exist";
 
 let
-  gitDir = if (readDir (dirOf dotGit)).".git" == "directory"
-    then dotGit
-      else let
-        worktreeGitlink = readFile dotGit;
-        worktreeDir = elemAt (match "gitdir: (.*)\n" worktreeGitlink) 0;
-        commondir' = readFile (worktreeDir + "/commondir");
-        commondirParts = filter isString
-          (split "/" (elemAt (match "(.*)\n" commondir') 0));
-        makeAbsolute = parts: d:
-          if parts == [ ] then d else makeAbsolute (tail parts) (dirOf d);
-      in
-        makeAbsolute commondirParts worktreeDir;
+  inWorktree = ! ((readDir (dirOf dotGit)).".git" == "directory");
+
+  worktreeGitlink = readFile dotGit;
+
+  worktreeDir = elemAt (match "gitdir: (.*)\n" worktreeGitlink) 0;
+
+  commondir' = readFile (worktreeDir + "/commondir");
+
+  commondirParts = filter isString
+    (split "/" (elemAt (match "(.*)\n" commondir') 0));
+
+  makeAbsolute = parts: d:
+    if parts == [ ] then d else makeAbsolute (tail parts) (dirOf d);
+
+  commondir =
+    if inWorktree
+    then makeAbsolute commondirParts worktreeDir
+    else dotGit;
+
+  gitDir = if !inWorktree then dotGit else worktreeDir;
 in
 
 rec {
@@ -132,7 +140,7 @@ rec {
                   else [ ];
 
                 remotePath = x: remote:
-                  if pathExists (gitDir + "/refs/remotes/${remote}/${x.ref}")
+                  if pathExists (commondir + "/refs/remotes/${remote}/${x.ref}")
                   then [ "refs/remotes/${remote}/${x.ref}" ]
                   else [ ];
 
@@ -161,7 +169,7 @@ rec {
 
             raw.refs.heads =
               let
-                res = lib.tryReadFile (gitDir + "/${ref}");
+                res = lib.tryReadFile (commondir + "/${ref}");
               in
               {
                 "${short-ref}" = tryEval res;
@@ -180,12 +188,12 @@ rec {
               if !isNull matches
               then elemAt matches 0
               else
-                throw "failed parsing ${gitDir}/${ref}, got: ${val}";
+                throw "failed parsing ${commondir}/${ref}, got: ${val}";
 
             packed-ref =
               let
                 msg =
-                  "${toString ref}${toString rev} missing from ${gitDir}/packed-refs";
+                  "${toString ref}${toString rev} missing from ${commondir}/packed-refs";
               in
               if isNull packed-refs
               then null
@@ -198,14 +206,14 @@ rec {
               then refs.heads."${short-ref}"
 
               else if isNull packed-refs
-              then throw "${gitDir}/${ref} missing and ${gitDir}/packed-refs does not exist"
+              then throw "${commondir}/${ref} missing and ${commondir}/packed-refs does not exist"
 
               else if (tryEval packed-ref).success
               then packed-ref.rev
 
               else
                 throw
-                  "could not find current revision in: ${gitDir}/HEAD, ${gitDir}/${ref}, ${gitDir}/packed-refs";
+                  "could not find current revision in: ${gitDir}/HEAD, ${commondir}/${ref}, ${commondir}/packed-refs";
           };
 
       rev = HEAD.fold { rev = r: r.rev; ref = r: r.rev; };
@@ -228,13 +236,17 @@ rec {
     else null;
 
   raw = {
+    inherit commondir gitDir;
+
     HEAD = readFile (gitDir + "/HEAD");
 
     FETCH_HEAD = tryEval (lib.tryReadFile (gitDir + "/FETCH_HEAD"));
 
-    packed-refs = tryEval (lib.tryReadFile (gitDir + "/packed-refs"));
+    packed-refs =
+      assert (builtins.trace "${commondir + "/packed-refs"}" true);
+      tryEval (lib.tryReadFile (commondir + "/packed-refs"));
 
-    refs.remotes = lib.tryReadDir (gitDir + "/refs/remotes");
+    refs.remotes = lib.tryReadDir (commondir + "/refs/remotes");
   };
 
   lib = {
@@ -242,7 +254,6 @@ rec {
     # caught with tryEval, which we want to handle by checking
     # packed-refs as fallback
     tryReadFile = file:
-      assert !isPath file -> throw "${file} is not an absolute path";
       if pathExists file
       then readFile file
       else throw "${toString file} does not exist";
@@ -251,7 +262,6 @@ rec {
     # caught with tryEval, which we want to handle by checking
     # packed-refs as fallback
     tryReadDir = dir:
-      assert !isPath dir -> throw "${dir} is not an absolute path";
       if pathExists dir
       then readDir dir
       else throw "${toString dir} does not exist";
@@ -292,7 +302,7 @@ rec {
 
     remotesMatching = rev: dir:
       let
-        d = lib.tryReadDir (gitDir + "/refs/remotes/${dir}");
+        d = lib.tryReadDir (commondir + "/refs/remotes/${dir}");
 
         d' = attrNames d;
 
@@ -300,7 +310,7 @@ rec {
 
         files = filter (p: d."${p}" == "regular") d';
 
-        refFile = f: gitDir + "/refs/remotes/${dir}/${f}";
+        refFile = f: commondir + "/refs/remotes/${dir}/${f}";
 
         hasRev = f: !isNull (match "${rev}\n" (lib.tryReadFile (refFile f)));
 
