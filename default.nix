@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-gitDir:
+dotGit:
 
 let
   inherit (builtins)
     attrNames
     concatMap
+    dirOf
     elemAt
     filter
     foldl'
@@ -31,10 +32,26 @@ let
     stringLength
     substring
     tryEval
+    tail
     ;
 in
 
-assert !pathExists gitDir -> throw "${gitDir} does not exist";
+assert !pathExists dotGit -> throw "${dotGit} does not exist";
+
+let
+  gitDir = if (readDir (dirOf dotGit)).".git" == "directory"
+    then dotGit
+      else let
+        worktreeGitlink = readFile dotGit;
+        worktreeDir = elemAt (match "gitdir: (.*)\n" worktreeGitlink) 0;
+        commondir' = readFile (worktreeDir + "/commondir");
+        commondirParts = filter isString
+          (split "/" (elemAt (match "(.*)\n" commondir') 0));
+        makeAbsolute = parts: d:
+          if parts == [ ] then d else makeAbsolute (tail parts) (dirOf d);
+      in
+        makeAbsolute commondirParts worktreeDir;
+in
 
 rec {
   HEAD =
