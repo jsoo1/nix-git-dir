@@ -29,9 +29,9 @@ https://git-scm.com/docs/gitrepository-layout
 
 # Unimplemented (yet)
 
-- Worktrees
-- commondir
+- submodules
 
 # May never be implemented
 
 - non-file refstore backend
+- submodules
